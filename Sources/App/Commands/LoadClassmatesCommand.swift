@@ -8,16 +8,25 @@ struct LoadClassmatesCommand: Command {
     }
 
     func run(using context: CommandContext, signature: Signature) throws {
-        let twitter = Twitter(
-            client: context.application.client,
-            bearerToken: Environment.get("TWITTER_BEARER_TOKEN") ?? ""
-        )
-        Task.runDetached(priority: TaskPriority.medium) {
+        try context.application.eventLoopGroup.next().performWithTask {
+            let twitter = Twitter(
+                client: context.application.client,
+                bearerToken: Environment.get("TWITTER_BEARER_TOKEN") ?? ""
+            )
+
             do {
-                try await twitter.searchTweets()
+                let tweets = try await twitter.searchTweets(using: [
+                    "query": "#100DaysOfSwiftUI -is:retweet",
+                    "tweet.fields": "author_id,created_at",
+                    "max_results": "100"
+                ])
+
+                for tweet in tweets {
+                    context.console.print(tweet.text, newLine: true)
+                }
             } catch {
                 print(error)
             }
-        }
+        }.wait()
     }
 }
