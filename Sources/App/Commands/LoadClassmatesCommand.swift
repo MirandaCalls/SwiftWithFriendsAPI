@@ -15,14 +15,19 @@ struct LoadClassmatesCommand: Command {
             )
 
             do {
-                let tweets = try await twitter.searchTweets(using: [
-                    "query": "#100DaysOfSwiftUI -is:retweet",
-                    "tweet.fields": "author_id,created_at",
-                    "max_results": "100"
-                ])
+                // let tweets = try await twitter.searchTweets(using: [
+                //     "query": "#100DaysOfSwiftUI -is:retweet",
+                //     "tweet.fields": "author_id,created_at",
+                //     "max_results": "100"
+                // ])
 
-                for tweet in tweets {
-                    context.console.print(tweet.text, newLine: true)
+                // for tweet in tweets {
+                //     context.console.print(tweet.text, newLine: true)
+                // }
+
+                let users = try await twitter.getUsersBy(ids: [30286504, 1447978036352241668])
+                for user in users {
+                    context.console.print(user.username, newLine: true)
                 }
             } catch {
                 print(error)
