@@ -20,15 +20,20 @@ struct LoadClassmatesCommand: Command {
                 //     "tweet.fields": "author_id,created_at",
                 //     "max_results": "100"
                 // ])
-
                 // for tweet in tweets {
                 //     context.console.print(tweet.text, newLine: true)
                 // }
 
-                let users = try await twitter.getUsersBy(ids: [30286504, 1447978036352241668])
+                let users = try await twitter.getUsersBy(ids: [30286504, 1447978036352241668], includeFollows: true)
                 for user in users {
                     context.console.print(user.username, newLine: true)
+                    context.console.print("Follows: \(user.follows?.count ?? 0)", newLine: true)
                 }
+
+                // let follows = try await twitter.getUserFollowsBy(userId: 30286504)
+                // for follow in follows {
+                //     context.console.print(follow.username)
+                // }
             } catch {
                 print(error)
             }

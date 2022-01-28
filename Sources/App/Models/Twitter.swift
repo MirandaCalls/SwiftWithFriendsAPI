@@ -46,7 +46,7 @@ struct User: Content {
     var createdAt: String
     var description: String
     var name: String
-    var friendIds: [Int]?
+    var follows: [UserFollow]?
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -77,8 +77,38 @@ struct User: Content {
     }
 }
 
+struct UserFollow: Content {
+    enum CodingKeys: CodingKey {
+        case id, username, name
+    }
+
+    var id: Int
+    var username: String
+    var name: String
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        let id = try container.decode(String.self, forKey: .id)
+        self.id = Int(id) ?? 0
+
+        self.username = try container.decode(String.self, forKey: .username)
+        self.name = try container.decode(String.self, forKey: .name)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        let id = String(self.id)
+        try container.encode(id, forKey: .id)
+
+        try container.encode(self.username, forKey: .username)
+        try container.encode(self.name, forKey: .name)
+    }
+}
+
 enum TwitterError: Error {
-    case requestError, decodeError
+    case requestError, decodeError, rateLimitError
 }
 
 struct Twitter {
@@ -98,23 +128,7 @@ struct Twitter {
                 search_fields["next_token"] = next_token
             }
 
-            let res = try await client.get("\(self.twitterApiUrl)/tweets/search/recent") { req in
-                try req.query.encode(search_fields)
-                let auth = BearerAuthorization(token: self.bearerToken)
-                req.headers.bearerAuthorization = auth
-            }
-
-            if res.status != .ok {
-                throw TwitterError.requestError
-            }
-
-            let response: TwitterResponse<Tweet>
-            do {
-                response = try res.content.decode(TwitterResponse<Tweet>.self)
-            } catch {
-                throw TwitterError.decodeError
-            }
-
+            let response: TwitterResponse<Tweet> = try await self.search(relativePath: "/tweets/search/recent", fields: search_fields)
             tweets = tweets + response.data
             next_token = response.meta?.next_token ?? ""
         } while next_token != ""
@@ -122,33 +136,75 @@ struct Twitter {
         return tweets
     }
 
-    func getUsersBy(ids: [Int]) async throws -> [User] {
-        // TODO: Chunk ids by groups of 100
+    func getUsersBy(ids: [Int], includeFollows: Bool = false) async throws -> [User] {
+        var users = [User]()
+        let batches = ids.chunked(into: 100)
+        for batch in batches {
+            let ids_converted = batch.map{ String($0) }
+            let ids_joined = ids_converted.joined(separator: ",")
 
-        let ids_converted = ids.map{ String($0) }
-        let ids_joined = ids_converted.joined(separator: ",")
-
-        let res = try await client.get("\(self.twitterApiUrl)/users") { req in
-            try req.query.encode([
+            let response: TwitterResponse<User> = try await self.search(relativePath: "/users", fields: [
                 "ids": ids_joined,
-                "user.fields": "id,username,profile_image_url,url,created_at,description,name",
+                "user.fields": "id,username,profile_image_url,url,created_at,description,name"
             ])
+
+            users = users + response.data
+        }
+
+        if includeFollows {
+            var updated_users = [User]()
+            for user in users {
+                var updated = user
+                updated.follows = try await self.getUserFollowsBy(userId: user.id)
+                updated_users.append(updated)
+            }
+            users = updated_users
+        }
+
+        return users
+    }
+
+    func getUserFollowsBy(userId: Int) async throws -> [UserFollow] {
+        var search_fields = ["max_results": "1000"]
+        var follows = [UserFollow]()
+        var next_token = ""
+        repeat {
+            if next_token != "" {
+                search_fields["next_token"] = next_token
+            }
+
+            let response: TwitterResponse<UserFollow> = try await self.search(relativePath: "/users/\(userId)/following", fields: search_fields)
+            follows = follows + response.data
+            next_token = response.meta?.next_token ?? ""
+        } while next_token != ""
+
+        return follows
+    }
+
+    fileprivate func search<T>(relativePath: String, fields: [String: String], retryCount: Int = 0) async throws -> TwitterResponse<T> {
+        let res = try await client.get("\(self.twitterApiUrl)\(relativePath)") { req in
+            try req.query.encode(fields)
             let auth = BearerAuthorization(token: self.bearerToken)
             req.headers.bearerAuthorization = auth
+        }
+
+        if res.status == .tooManyRequests && retryCount < 2 {
+            sleep(UInt32(self.waitTimeSeconds))
+            let retries = retryCount + 1
+            return try await self.search(relativePath: relativePath, fields: fields, retryCount: retries)
         }
 
         if res.status != .ok {
             throw TwitterError.requestError
         }
 
-        let response: TwitterResponse<User>
+        let response: TwitterResponse<T>
         do {
-            response = try res.content.decode(TwitterResponse<User>.self)
+            response = try res.content.decode(TwitterResponse<T>.self)
         } catch {
             throw TwitterError.decodeError
         }
 
-        return response.data
+        return response
     }
-
 }
