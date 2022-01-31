@@ -108,7 +108,7 @@ struct UserFollow: Content {
 }
 
 enum TwitterError: Error {
-    case requestError, decodeError, rateLimitError
+    case requestError(HTTPStatus), decodeError, rateLimitError
 }
 
 struct Twitter {
@@ -136,7 +136,7 @@ struct Twitter {
         return tweets
     }
 
-    func getUsersBy(ids: [Int], includeFollows: Bool = false) async throws -> [User] {
+    func getUsersBy(ids: [Int]) async throws -> [User] {
         var users = [User]()
         let batches = ids.chunked(into: 100)
         for batch in batches {
@@ -149,16 +149,6 @@ struct Twitter {
             ])
 
             users = users + response.data
-        }
-
-        if includeFollows {
-            var updated_users = [User]()
-            for user in users {
-                var updated = user
-                updated.follows = try await self.getUserFollowsBy(userId: user.id)
-                updated_users.append(updated)
-            }
-            users = updated_users
         }
 
         return users
@@ -195,7 +185,7 @@ struct Twitter {
         }
 
         if res.status != .ok {
-            throw TwitterError.requestError
+            throw TwitterError.requestError(res.status)
         }
 
         let response: TwitterResponse<T>

@@ -6,7 +6,7 @@ struct Classmate: Content {
     var username: String
     var profileImageUrl: String
     var url: String
-    var joinedAt: Date
+    var joinedAt: String
     var description: String
     var name: String
     var friendIds: [Int]
