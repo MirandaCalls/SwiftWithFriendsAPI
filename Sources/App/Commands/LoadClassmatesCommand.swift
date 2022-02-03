@@ -8,6 +8,11 @@ struct LoadClassmatesCommand: Command {
     }
 
     func run(using context: CommandContext, signature: Signature) throws {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.000Z"
+
+        let controller = ClassmatesController(db: context.application.db)
+
         try context.application.eventLoopGroup.next().performWithTask {
             let twitter = Twitter(
                 client: context.application.client,
@@ -40,17 +45,19 @@ struct LoadClassmatesCommand: Command {
                     
                     classmates.append(
                         Classmate(
-                            id: user.id,
                             username: user.username,
                             profileImageUrl: user.profileImageUrl,
                             url: user.url,
-                            joinedAt: user.createdAt,
+                            joinedAt: formatter.date(from: user.createdAt) ?? Date(),
                             description: user.description,
                             name: user.name,
                             friendIds: friend_ids
                         )
                     )
                 }
+
+                try await controller.deleteAll()
+                try await controller.insert(records: classmates)
             } catch {
                 print(error)
             }

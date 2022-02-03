@@ -1,11 +1,18 @@
 import Vapor
+import Fluent
 
 struct ClassmatesController {
-    func getClassmates() async throws {
+    let db: Database
 
+    func getAll() async throws -> [Classmate] {
+        return try await Classmate.query(on: self.db).all()
     }
     
-    func insertClassmates() async throws {
+    func insert(records: [Classmate]) async throws {
+        try await records.create(on: self.db)
+    }
 
-    }  
+    func deleteAll() async throws {
+        try await Classmate.query(on: self.db).delete()
+    }
 }

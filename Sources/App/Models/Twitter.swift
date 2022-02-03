@@ -108,7 +108,7 @@ struct UserFollow: Content {
 }
 
 enum TwitterError: Error {
-    case requestError(HTTPStatus), decodeError, rateLimitError
+    case requestError(HTTPStatus, String), decodeError, rateLimitError
 }
 
 struct Twitter {
@@ -160,7 +160,7 @@ struct Twitter {
         var next_token = ""
         repeat {
             if next_token != "" {
-                search_fields["next_token"] = next_token
+                search_fields["pagination_token"] = next_token
             }
 
             let response: TwitterResponse<UserFollow> = try await self.search(relativePath: "/users/\(userId)/following", fields: search_fields)
@@ -185,13 +185,23 @@ struct Twitter {
         }
 
         if res.status != .ok {
-            throw TwitterError.requestError(res.status)
+            var body = ""
+            if let payload = res.body {
+                body = String(data: Data(payload.readableBytesView), encoding: .utf8) ?? ""
+            }
+
+            throw TwitterError.requestError(res.status, body)
         }
 
         let response: TwitterResponse<T>
         do {
             response = try res.content.decode(TwitterResponse<T>.self)
         } catch {
+            var body = ""
+            if let payload = res.body {
+                body = String(data: Data(payload.readableBytesView), encoding: .utf8) ?? ""
+            }
+            print(body)
             throw TwitterError.decodeError
         }
 
