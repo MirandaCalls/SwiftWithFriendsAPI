@@ -4,6 +4,7 @@ struct migration_1_classmates_table: Migration {
     func prepare(on database: Database) -> EventLoopFuture<Void> {
         return database.schema(Classmate.schema)
             .id()
+            .field("twitterId", .int, .required)
             .field("username", .string, .required)
             .field("profileImageUrl", .string, .required)
             .field("url", .string, .required)

@@ -1,7 +1,7 @@
 import Vapor
 
 struct TwitterResponse<T: Codable>: Content {
-    var data: [T]
+    var data: [T]?
     var meta: TwitterMeta?
 }
 
@@ -34,7 +34,7 @@ struct Tweet: Content {
     }
 }
 
-struct User: Content {
+struct TwitterUser: Content {
     enum CodingKeys: CodingKey {
         case id, username, profile_image_url, url, created_at, description, name
     }
@@ -129,26 +129,26 @@ struct Twitter {
             }
 
             let response: TwitterResponse<Tweet> = try await self.search(relativePath: "/tweets/search/recent", fields: search_fields)
-            tweets = tweets + response.data
+            tweets = tweets + (response.data ?? [Tweet]())
             next_token = response.meta?.next_token ?? ""
         } while next_token != ""
 
         return tweets
     }
 
-    func getUsersBy(ids: [Int]) async throws -> [User] {
-        var users = [User]()
+    func getUsersBy(ids: [Int]) async throws -> [TwitterUser] {
+        var users = [TwitterUser]()
         let batches = ids.chunked(into: 100)
         for batch in batches {
             let ids_converted = batch.map{ String($0) }
             let ids_joined = ids_converted.joined(separator: ",")
 
-            let response: TwitterResponse<User> = try await self.search(relativePath: "/users", fields: [
+            let response: TwitterResponse<TwitterUser> = try await self.search(relativePath: "/users", fields: [
                 "ids": ids_joined,
                 "user.fields": "id,username,profile_image_url,url,created_at,description,name"
             ])
 
-            users = users + response.data
+            users = users + (response.data ?? [TwitterUser]())
         }
 
         return users
@@ -164,7 +164,7 @@ struct Twitter {
             }
 
             let response: TwitterResponse<UserFollow> = try await self.search(relativePath: "/users/\(userId)/following", fields: search_fields)
-            follows = follows + response.data
+            follows = follows + (response.data ?? [UserFollow]())
             next_token = response.meta?.next_token ?? ""
         } while next_token != ""
 

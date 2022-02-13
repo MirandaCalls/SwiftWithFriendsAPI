@@ -6,8 +6,9 @@ final class Classmate: Model, Content {
     static let schema = "classmates"
 
     @ID(key: .id)
-    var id: Int?
+    var id: UUID?
 
+    @Field(key: "twitterId") var twitterId: Int
     @Field(key: "username") var username: String
     @Field(key: "profileImageUrl") var profileImageUrl: String
     @Field(key: "url") var url: String
@@ -19,6 +20,7 @@ final class Classmate: Model, Content {
     init() { }
 
     init(
+        twitterId: Int,
         username: String,
         profileImageUrl: String,
         url: String,
@@ -27,6 +29,7 @@ final class Classmate: Model, Content {
         name: String,
         friendIds: [Int]
     ) {
+        self.twitterId = twitterId
         self.username = username
         self.profileImageUrl = profileImageUrl
         self.url = url

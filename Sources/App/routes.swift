@@ -5,7 +5,7 @@ func routes(_ app: Application) throws {
         return "Online!"
     }
 
-    app.get("/classmates") { req -> String in
-        return "TODO"
+    app.get("api", "classmates") { req in
+        return Classmate.query(on: req.application.db).all()
     }
 }
